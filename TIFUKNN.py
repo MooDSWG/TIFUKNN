@@ -4,7 +4,6 @@ import sys
 import math
 import csv
 
-
 activate_codes_num = -1
 next_k_step = 1
 training_chunk = 0
@@ -287,7 +286,8 @@ def generate_dictionary_BA(files, attributes_list):
         dictionary_table[attr] = dictionary
         counter_table[attr] = 0
 
-    csv.field_size_limit(sys.maxsize)
+    #csv.field_size_limit(sys.maxsize)
+    #"csv.field_size_limit(sys.maxsize)" works on mac but not on windows, comment this line in order to prevent overflow error on windows, however, it does not effect the final result(dont know why) 
     for filename in files:
         count = 0
         with open(filename, 'r') as csvfile:
@@ -683,6 +683,7 @@ def main(argv):
 
 
     files = [argv[1], argv[2]]
+    print(sys.maxsize)
 
     data_chunk, input_size, code_freq_at_first_claim = read_claim2vector_embedding_file_no_vector(files)
 

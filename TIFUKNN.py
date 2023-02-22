@@ -579,7 +579,7 @@ def merge_history_and_neighbors_future(future_data, sum_history_test, test_key_s
     return merged_history
 
 def evaluate(data_chunk,  training_key_set, test_key_set, input_size, group_size,
-             within_decay_rate, group_decay_rate, num_nearest_neighbors, alpha,  topk):
+             within_decay_rate, group_decay_rate, num_nearest_neighbors, alpha):
     activate_codes_num = -1
     temporal_decay_sum_history_training = temporal_decay_sum_history(data_chunk[training_chunk],
                                                                      training_key_set, input_size,
@@ -600,83 +600,88 @@ def evaluate(data_chunk,  training_key_set, test_key_set, input_size, group_size
     if activate_codes_num < 0:
         # for i in range(1, 6):
 
-        prec = []
-        rec = []
-        F = []
-        prec1 = []
-        rec1 = []
-        F1 = []
-        prec2 = []
-        rec2 = []
-        F2 = []
-        prec3 = []
-        rec3 = []
-        F3 = []
-        NDCG = []
-        n_hit = 0
+        recall_list = []
+        ndcg_list = []
+        hr_list = []
+        topk_list = [5,10]
+        for i,topk in enumerate(topk_list):
+            prec = []
+            rec = []
+            F = []
+            prec1 = []
+            rec1 = []
+            F1 = []
+            prec2 = []
+            rec2 = []
+            F2 = []
+            prec3 = []
+            rec3 = []
+            F3 = []
+            NDCG = []
+            n_hit = 0
+            num_ele = topk
+            # print('k = ' + str(activate_codes_num))
+            # evaluate(data_chunk, input_size,test_KNN_history, test_key_set, next_k_step)
+            count = 0
+            for iter in range(len(test_key_set)):
+                # training_pair = training_pairs[iter - 1]
+                # input_variable = training_pair[0]
+                # target_variable = training_pair[1]
+                input_variable = data_chunk[training_chunk][test_key_set[iter]]
+                target_variable = data_chunk[test_chunk][test_key_set[iter]]
 
-        num_ele = topk
-        # print('k = ' + str(activate_codes_num))
-        # evaluate(data_chunk, input_size,test_KNN_history, test_key_set, next_k_step)
-        count = 0
-        for iter in range(len(test_key_set)):
-            # training_pair = training_pairs[iter - 1]
-            # input_variable = training_pair[0]
-            # target_variable = training_pair[1]
-            input_variable = data_chunk[training_chunk][test_key_set[iter]]
-            target_variable = data_chunk[test_chunk][test_key_set[iter]]
+                if len(target_variable) < 2 + next_k_step:
+                    continue
+                count += 1
+                output_vectors = predict_with_elements_in_input(sum_history, test_key_set[iter])
+                top = 400
+                hit = 0
+                for idx in range(len(output_vectors)):
+                    # for idx in [2]:
 
-            if len(target_variable) < 2 + next_k_step:
-                continue
-            count += 1
-            output_vectors = predict_with_elements_in_input(sum_history, test_key_set[iter])
-            top = 400
-            hit = 0
-            for idx in range(len(output_vectors)):
-                # for idx in [2]:
+                    output = np.zeros(input_size)
+                    target_topi = output_vectors[idx].argsort()[::-1][:top]
+                    c = 0
+                    for i in range(top):
+                        if c >= num_ele:
+                            break
+                        output[target_topi[i]] = 1
+                        c += 1
 
-                output = np.zeros(input_size)
-                target_topi = output_vectors[idx].argsort()[::-1][:top]
-                c = 0
-                for i in range(top):
-                    if c >= num_ele:
-                        break
-                    output[target_topi[i]] = 1
-                    c += 1
-
-                vectorized_target = np.zeros(input_size)
-                for ii in target_variable[1 + idx]:
-                    vectorized_target[ii] = 1
-                precision, recall, Fscore, correct = get_precision_recall_Fscore \
-                    (vectorized_target, output)
-                prec.append(precision)
-                rec.append(recall)
-                F.append(Fscore)
-                if idx == 0:
-                    prec1.append(precision)
-                    rec1.append(recall)
-                    F1.append(Fscore)
-                elif idx == 1:
-                    prec2.append(precision)
-                    rec2.append(recall)
-                    F2.append(Fscore)
-                elif idx == 2:
-                    prec3.append(precision)
-                    rec3.append(recall)
-                    F3.append(Fscore)
-                hit += get_HT(vectorized_target, target_topi, num_ele)
-                ndcg = get_NDCG1(vectorized_target, target_topi, num_ele)
-                NDCG.append(ndcg)
-            if hit == next_k_step:
-                n_hit += 1
+                    vectorized_target = np.zeros(input_size)
+                    for ii in target_variable[1 + idx]:
+                        vectorized_target[ii] = 1
+                    precision, recall, Fscore, correct = get_precision_recall_Fscore \
+                        (vectorized_target, output)
+                    prec.append(precision)
+                    rec.append(recall)
+                    F.append(Fscore)
+                    if idx == 0:
+                        prec1.append(precision)
+                        rec1.append(recall)
+                        F1.append(Fscore)
+                    elif idx == 1:
+                        prec2.append(precision)
+                        rec2.append(recall)
+                        F2.append(Fscore)
+                    elif idx == 2:
+                        prec3.append(precision)
+                        rec3.append(recall)
+                        F3.append(Fscore)
+                    hit += get_HT(vectorized_target, target_topi, num_ele)
+                    ndcg = get_NDCG1(vectorized_target, target_topi, num_ele)
+                    NDCG.append(ndcg)
+                if hit == next_k_step:
+                    n_hit += 1
 
 
-        # print('average precision of ' + ': ' + str(np.mean(prec)) + ' with std: ' + str(np.std(prec)))
-        recall = np.mean(rec)
-        ndcg = np.mean(NDCG)
-        hr = n_hit / len(test_key_set)
+            # print('average precision of ' + ': ' + str(np.mean(prec)) + ' with std: ' + str(np.std(prec)))
+            recall_list.append(np.mean(rec))
+            ndcg_list.append(np.mean(NDCG))
+            hr_list.append(n_hit / len(test_key_set))
+            #hr_still buggy
 
-    return recall, ndcg, hr
+    return recall_list, ndcg_list, hr_list
 
 
 def main(argv):
@@ -696,7 +701,7 @@ def main(argv):
     group_decay_rate = float(argv[5])
     alpha = float(argv[6])
     group_size = int(argv[7])
-    topk = int(argv[8])
+    #topk = int(argv[8])
 
     # num_nearest_neighbors = 300
     # within_decay_rate = 0.9
@@ -706,13 +711,15 @@ def main(argv):
     # topk = 10
 
 
-    print('Num. of top: ', topk)
-    recall, ndcg, hr = evaluate(data_chunk, training_key_set, test_key_set, input_size,
+    print('Num. of top: ', "[5,10]")
+    recall_list, ndcg_list, hr_list = evaluate(data_chunk, training_key_set, test_key_set, input_size,
                                 group_size, within_decay_rate, group_decay_rate,
-                                num_nearest_neighbors, alpha,  topk)
+                                num_nearest_neighbors, alpha)
 
-    print('recall: ', str(recall))
-    print('NDCG: ', str(ndcg))
+    print('recall@5: ', str(recall_list[0]))
+    print('NDCG@5: ', str(ndcg_list[0]))
+    print('recall@10: ', str(recall_list[1]))
+    print('NDCG@10: ', str(ndcg_list[1]))
     # print('hit ratio: ', str(hr))
     sys.stdout.flush()
 
